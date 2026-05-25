@@ -1,16 +1,8 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
-import path from "path";
 
 async function main() {
-  const dbPath = "file:" + path.join(process.cwd(), "dev.db");
-  console.log(`Connecting to database at: ${dbPath}`);
-  
-  const adapter = new PrismaLibSql({
-    url: dbPath,
-  });
-  
-  const prisma = new PrismaClient({ adapter });
+  console.log("Connecting to PostgreSQL database...");
+  const prisma = new PrismaClient();
 
   console.log("Seeding database...");
 
