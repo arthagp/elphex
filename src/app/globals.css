@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-blue: #0085FF;
+  --color-xp-purple: #a855f7;
+  --color-streak-orange: #f97316;
+  --color-pet-cyan: #06b6d4;
+  --color-dark-bg: #090e1a;
+  --color-glass-card: rgba(17, 24, 47, 0.65);
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  
+  --animate-float: float 4s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-level-up: level-up 1.2s ease-out forwards;
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-8px) rotate(2deg); }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 4px rgba(0, 133, 255, 0.4)); }
+    50% { opacity: 1; filter: drop-shadow(0 0 12px rgba(0, 133, 255, 0.8)); }
+  }
+  @keyframes level-up {
+    0% { transform: scale(0.6) translateY(20px); opacity: 0; }
+    50% { transform: scale(1.1) translateY(-10px); opacity: 1; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+}
+
+:root {
+  --background: #090e1a;
+  --foreground: #f8fafc;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Outfit', sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(0, 133, 255, 0.1) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, rgba(168, 85, 247, 0.08) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(6, 182, 212, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Custom Scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(9, 14, 26, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 133, 255, 0.6);
+}
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(17, 24, 47, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-panel-glow {
+  background: rgba(17, 24, 47, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 133, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 133, 255, 0.05);
+}
+
+.glass-input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  transition: all 0.2s ease-in-out;
+}
+.glass-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(0, 133, 255, 0.5);
+  box-shadow: 0 0 10px rgba(0, 133, 255, 0.2);
+}
+
+/* Text glow effects */
+.text-glow-blue {
+  text-shadow: 0 0 10px rgba(0, 133, 255, 0.5);
+}
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+}
+.text-glow-orange {
+  text-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+}
+
+/* Custom Pomodoro Progress circle */
+.radial-progress-circle {
+  transition: stroke-dashoffset 0.35s;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}

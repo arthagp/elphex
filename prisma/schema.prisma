@@ -1,0 +1,353 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 5.1 Auth & User
+model User {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  profile        Profile?
+  oauthAccounts  OAuthAccount[]
+  memberships    WorkspaceMember[]
+  ownedWorkspaces Workspace[]     @relation("OwnedWorkspaces")
+  projectsCreated Project[]       @relation("CreatedProjects")
+  tasksCreated   Task[]           @relation("CreatedTasks")
+  assignees      TaskAssignee[]
+  attachments    Attachment[]
+  comments       Comment[]
+  activityLogs   ActivityLog[]
+  xp             UserXP?
+  streak         Streak?
+  achievements   UserAchievement[]
+  pet            ElphPet?
+  leaderboards   LeaderboardEntry[]
+  rewardsBought  UserReward[]
+  timeEntries    TimeEntry[]
+}
+
+model Profile {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  avatarUrl String?
+  bio       String?
+  timezone  String   @default("UTC")
+}
+
+model OAuthAccount {
+  id         String @id @default(cuid())
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider   String
+  providerId String
+
+  @@unique([provider, providerId])
+}
+
+// 5.2 Workspace & Project
+model Workspace {
+  id         String            @id @default(cuid())
+  name       String
+  slug       String            @unique
+  ownerId    String
+  owner      User              @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
+  plan       String            @default("FREE") // FREE, PRO, ENTERPRISE
+  createdAt  DateTime          @default(now())
+  members    WorkspaceMember[]
+  projects   Project[]
+  labels     Label[]
+  leaderboard LeaderboardEntry[]
+}
+
+model WorkspaceMember {
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("MEMBER") // OWNER, ADMIN, MEMBER, GUEST, VIEWER
+  joinedAt    DateTime  @default(now())
+
+  @@id([workspaceId, userId])
+}
+
+model Project {
+  id          String      @id @default(cuid())
+  workspaceId String
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  color       String      @default("#0085FF")
+  isArchived  Boolean     @default(false)
+  createdBy   String
+  creator     User        @relation("CreatedProjects", fields: [createdBy], references: [id])
+  createdAt   DateTime    @default(now())
+  sections    Section[]
+  tasks       Task[]
+  sprints     Sprint[]
+  milestones  Milestone[]
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  position  Float
+  tasks     Task[]
+}
+
+// 5.3 Task System
+model Task {
+  id          String           @id @default(cuid())
+  title       String
+  description String?
+  status      String           @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  priority    String           @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime?
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sectionId   String
+  section     Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  createdBy   String
+  creator     User             @relation("CreatedTasks", fields: [createdBy], references: [id])
+  position    Float
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+  
+  subtasks     Subtask[]
+  assignees    TaskAssignee[]
+  dependencies TaskDependency[] @relation("TaskDependencies")
+  dependents   TaskDependency[] @relation("TaskDependents")
+  labels       TaskLabel[]
+  recurrence   RecurrenceRule?
+  attachments  Attachment[]
+  comments     Comment[]
+  activityLogs ActivityLog[]
+  timeEntries  TimeEntry[]
+  snapshots    TaskSnapshot[]
+}
+
+model Subtask {
+  id       String  @id @default(cuid())
+  taskId   String
+  task     Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  title    String
+  isDone   Boolean @default(false)
+  position Float
+}
+
+model TaskAssignee {
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+}
+
+model TaskDependency {
+  taskId          String
+  task            Task   @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOnTaskId String
+  dependsOnTask   Task   @relation("TaskDependents", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  type            String @default("BLOCKS") // BLOCKS, BLOCKED_BY, RELATED
+
+  @@id([taskId, dependsOnTaskId])
+}
+
+model Label {
+  id          String      @id @default(cuid())
+  workspaceId String
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  color       String
+  tasks       TaskLabel[]
+}
+
+model TaskLabel {
+  taskId  String
+  task    Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  labelId String
+  label   Label  @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+}
+
+model RecurrenceRule {
+  taskId    String    @id
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  frequency String    // DAILY, WEEKLY, MONTHLY, CUSTOM
+  interval  Int       @default(1)
+  endDate   DateTime?
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileUrl    String
+  fileName   String
+  fileSize   Int
+  uploadedBy String
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+  createdAt  DateTime @default(now())
+}
+
+model Comment {
+  id        String    @id @default(cuid())
+  taskId    String
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  parentId  String?
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime  @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // CREATE, UPDATE, DELETE, COMPLETE, START_FOCUS, ADD_XP
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+}
+
+// 5.4 Gamification
+model UserXP {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp   Int      @default(0)
+  level     Int      @default(1)
+  updatedAt DateTime @updatedAt
+}
+
+model XPRule {
+  id                  String  @id @default(cuid())
+  eventType           String  @unique // TASK_COMPLETE, DEADLINE_ON_TIME, FOCUS_COMPLETED, FEED_PET
+  xpAmount            Int
+  multiplierCondition String? // e.g. STREAK_3X
+}
+
+model Streak {
+  userId           String    @id
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak    Int       @default(0)
+  longestStreak    Int       @default(0)
+  lastActivityDate DateTime?
+}
+
+model Achievement {
+  id             String            @id @default(cuid())
+  name           String
+  description    String
+  icon           String            @default("🏆")
+  conditionType  String            // TASKS_COMPLETED, FOCUS_HOURS, PET_LEVEL, STREAK_DAYS
+  conditionValue Int
+  users          UserAchievement[]
+}
+
+model UserAchievement {
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+
+  @@id([userId, achievementId])
+}
+
+model ElphPet {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String   @default("Elphy")
+  level     Int      @default(1)
+  mood      String   @default("HAPPY") // HAPPY, SLEEPY, FOCUSED, HUNGRY, EXCITED
+  color     String   @default("GREY")  // GREY, BLUE, GOLD, COSMIC
+  lastFedAt DateTime @default(now())
+}
+
+model LeaderboardEntry {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  period      String    // WEEKLY, MONTHLY
+  xp          Int       @default(0)
+  rank        Int       @default(0)
+
+  @@unique([workspaceId, userId, period])
+}
+
+model RewardItem {
+  id          String       @id @default(cuid())
+  name        String
+  type        String       // UI_THEME, AVATAR_FRAME, PET_COLOR, BADGE
+  xpCost      Int
+  isExclusive Boolean      @default(false)
+  users       UserReward[]
+}
+
+model UserReward {
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardId    String
+  reward      RewardItem @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  purchasedAt DateTime   @default(now())
+
+  @@id([userId, rewardId])
+}
+
+// 5.5 Sprint & Analytics
+model Sprint {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("PLANNING") // PLANNING, ACTIVE, COMPLETED
+}
+
+model Milestone {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  dueDate     DateTime
+  isCompleted Boolean  @default(false)
+}
+
+model TimeEntry {
+  id              String   @id @default(cuid())
+  taskId          String
+  task            Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  durationMinutes Int
+  startedAt       DateTime @default(now())
+  type            String   @default("FOCUS") // FOCUS, MANUAL
+}
+
+model TaskSnapshot {
+  id       String   @id @default(cuid())
+  taskId   String
+  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  date     DateTime @default(now())
+  status   String
+}
