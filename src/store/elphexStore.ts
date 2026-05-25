@@ -130,6 +130,7 @@ interface ElphexStore {
   activeProjectId: string | null;
   activeView: "kanban" | "list" | "timeline" | "calendar" | "table";
   isLoading: boolean;
+  theme: "light" | "dark";
 
   // Actions
   fetchInitialData: () => Promise<void>;
@@ -154,8 +155,10 @@ interface ElphexStore {
   purchaseReward: (rewardId: string) => Promise<boolean>;
   setActiveProjectId: (projectId: string | null) => void;
   setActiveView: (view: ElphexStore["activeView"]) => void;
-  showXpGain: (amount: number, message: string, isLevelUp?: boolean) => void;
   hideXpNotification: () => void;
+  toggleTheme: () => void;
+  moveTaskStatus: (taskId: string, targetStatus: string) => Promise<void>;
+  showXpGain: (amount: number, message: string, isLevelUp?: boolean) => void;
 }
 
 export const useElphexStore = create<ElphexStore>((set, get) => ({
@@ -173,6 +176,7 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
   isLoading: true,
   activeProjectId: null,
   activeView: "kanban",
+  theme: "dark",
   xpNotification: { show: false, amount: 0, message: "" },
   pomodoro: {
     isRunning: false,
@@ -518,11 +522,74 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
   setActiveProjectId: (projectId) => set({ activeProjectId: projectId }),
   setActiveView: (view) => set({ activeView: view }),
 
+  hideXpNotification: () =>
+    set((state) => ({
+      xpNotification: { ...state.xpNotification, show: false },
+    })),
+
+  toggleTheme: () => {
+    const nextTheme = get().theme === "dark" ? "light" : "dark";
+    set({ theme: nextTheme });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("elphex-theme", nextTheme);
+      if (nextTheme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+  },
+
+  moveTaskStatus: async (taskId, targetStatus) => {
+    const task = get().tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    if (task.status === targetStatus) return;
+
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        set((state) => {
+          const updatedTasks = state.tasks.map((t) =>
+            t.id === taskId ? { ...t, status: targetStatus } : t
+          );
+          return {
+            tasks: updatedTasks,
+            user: state.user
+              ? {
+                  ...state.user,
+                  level: data.level || state.user.level,
+                  totalXp: state.user.totalXp + (data.xpGained || 0),
+                }
+              : null,
+            pet: state.pet
+              ? {
+                  ...state.pet,
+                  mood: targetStatus === "DONE" ? "EXCITED" : state.pet.mood,
+                }
+              : null,
+          };
+        });
+
+        if (targetStatus === "DONE") {
+          get().showXpGain(data.xpGained || 50, "Tugas Selesai!", data.levelUp);
+        } else {
+          get().showXpGain(5, `Tugas dipindahkan ke ${targetStatus}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error moving task status", error);
+    }
+  },
+  
   showXpGain: (amount, message, isLevelUp = false) => {
     set({
       xpNotification: { show: true, amount, message, isLevelUp },
     });
-    // Trigger confetti if level up!
     if (isLevelUp) {
       import("canvas-confetti").then((confetti) => {
         confetti.default({
@@ -533,9 +600,4 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
       });
     }
   },
-
-  hideXpNotification: () =>
-    set((state) => ({
-      xpNotification: { ...state.xpNotification, show: false },
-    })),
 }));

@@ -40,10 +40,12 @@ export default function TasksPage() {
     addSubtask,
     toggleSubtask,
     deleteSubtask,
-    showXpGain
+    showXpGain,
+    moveTaskStatus
   } = useElphexStore();
 
   const [mounted, setMounted] = useState(false);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   
   // Filtering & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -273,7 +275,27 @@ export default function TasksPage() {
                   DONE: "Selesai",
                 };
                 return (
-                  <div key={status} className="p-4 rounded-2xl bg-slate-900/10 border border-slate-800/20 flex flex-col h-[550px]">
+                  <div 
+                    key={status} 
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDragEnter={() => setDragOverColumn(status)}
+                    onDragLeave={() => setDragOverColumn(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverColumn(null);
+                      const taskId = e.dataTransfer.getData("text/plain");
+                      if (taskId) {
+                        moveTaskStatus(taskId, status);
+                      }
+                    }}
+                    className={`p-4 rounded-2xl bg-slate-900/10 border flex flex-col h-[550px] transition-all duration-300 ${
+                      dragOverColumn === status 
+                        ? "border-[#0085FF] bg-[#0085FF]/5 shadow-lg shadow-blue-500/5 scale-[1.01]" 
+                        : "border-slate-800/20"
+                    }`}
+                  >
                     <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center space-x-2">
                         <div className={`w-2.5 h-2.5 rounded-full bg-gradient-to-r ${headerColors[status]}`}></div>
@@ -293,8 +315,16 @@ export default function TasksPage() {
                         list.map((task) => (
                           <div 
                             key={task.id}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", task.id);
+                              e.currentTarget.style.opacity = "0.5";
+                            }}
+                            onDragEnd={(e) => {
+                              e.currentTarget.style.opacity = "1";
+                            }}
                             onClick={() => setSelectedTask(task)}
-                            className="p-3.5 rounded-xl border border-slate-800/20 bg-slate-900/40 hover:border-slate-700/50 transition-all cursor-pointer relative group"
+                            className="p-3.5 rounded-xl border border-slate-800/20 bg-slate-900/40 hover:border-slate-700/50 hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 relative group"
                           >
                             <h5 className="font-bold text-xs text-slate-200 line-clamp-2">{task.title}</h5>
                             
@@ -571,7 +601,7 @@ export default function TasksPage() {
                   setSelectedTask(null);
                   setAiResult(null);
                 }}
-                className="fixed inset-0 bg-[#090e1a] z-40"
+                className="fixed inset-0 bg-black/50 z-40"
               />
 
               {/* Drawer Content */}
@@ -580,7 +610,7 @@ export default function TasksPage() {
                 animate={{ x: 0 }}
                 exit={{ x: "100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] glass-panel border-l border-slate-800/80 bg-[#0a0f1d] shadow-2xl p-6 z-50 overflow-y-auto flex flex-col space-y-6"
+                className="fixed right-0 top-0 bottom-0 w-full sm:w-[480px] bg-slate-950 border-l border-slate-800/80 shadow-2xl p-6 z-50 overflow-y-auto flex flex-col space-y-6"
               >
                 {/* Drawer Header */}
                 <div className="flex justify-between items-start">
@@ -755,13 +785,13 @@ export default function TasksPage() {
                 animate={{ opacity: 0.5 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setShowAddTaskModal(false)}
-                className="fixed inset-0 bg-[#090e1a] z-40"
+                className="fixed inset-0 bg-black/50 z-40"
               />
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed inset-0 m-auto w-[90%] max-w-[420px] h-fit glass-panel bg-[#0a0f1d] border border-slate-800 shadow-2xl p-6 rounded-2xl z-50 space-y-4"
+                className="fixed inset-0 m-auto w-[90%] max-w-[420px] h-fit glass-panel border border-slate-800 shadow-2xl p-6 rounded-2xl z-50 space-y-4"
               >
                 <div className="flex justify-between items-center">
                   <h3 className="font-extrabold text-sm text-slate-100 uppercase tracking-wider">Tambah Tugas Baru</h3>

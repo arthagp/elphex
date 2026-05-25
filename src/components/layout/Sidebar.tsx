@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -90,20 +91,23 @@ export default function Sidebar() {
       </button>
 
       {/* Brand Header */}
-      <div className={`p-6 flex items-center ${isCollapsed ? "justify-center" : "space-x-3"}`}>
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0085FF] to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <span className="text-xl">🐘</span>
-        </div>
-        {!isCollapsed && (
-          <div>
-            <h1 className="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-[#0085FF] to-cyan-400">
-              ELPHEX
-            </h1>
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest -mt-0.5">
-              Elephant Brain OS
-            </p>
+      <div className={`p-6 flex items-center justify-between ${isCollapsed ? "flex-col space-y-4" : ""}`}>
+        <div className={`flex items-center ${isCollapsed ? "justify-center" : "space-x-3"}`}>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0085FF] to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+            <span className="text-xl">🐘</span>
           </div>
-        )}
+          {!isCollapsed && (
+            <div>
+              <h1 className="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-[#0085FF] to-cyan-400">
+                ELPHEX
+              </h1>
+              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest -mt-0.5">
+                Elephant Brain OS
+              </p>
+            </div>
+          )}
+        </div>
+        <ThemeToggle isCollapsed={isCollapsed} />
       </div>
 
       {/* User Stats Card */}

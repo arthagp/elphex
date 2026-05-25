@@ -51,8 +51,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     };
   }, [xpNotification.show, hideXpNotification]);
 
+  // 4. Sync theme preferences from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("elphex-theme") as "light" | "dark" | null;
+      if (savedTheme === "light" || savedTheme === "dark") {
+        useElphexStore.setState({ theme: savedTheme });
+        if (savedTheme === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      } else {
+        document.documentElement.classList.add("dark");
+      }
+    }
+  }, []);
+
   return (
-    <div className="min-h-screen flex text-slate-100 bg-[#090e1a] relative overflow-hidden font-sans">
+    <div className="min-h-screen flex text-foreground bg-background relative overflow-hidden font-sans">
       {/* Background radial gradient blobs */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
         <div className="absolute top-[10%] left-[5%] w-[400px] h-[400px] rounded-full bg-blue-600/10 blur-[120px]"></div>
@@ -66,7 +83,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <motion.div 
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-[#090e1a] z-50 flex flex-col items-center justify-center"
+            className="fixed inset-0 bg-background z-50 flex flex-col items-center justify-center"
           >
             <div className="relative flex flex-col items-center">
               <span className="text-7xl animate-bounce block select-none">🐘</span>
