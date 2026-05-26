@@ -55,11 +55,16 @@ export default function TasksPage() {
   // New task form state
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskSection, setNewTaskSection] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState("MEDIUM");
+  const [newTaskDueDate, setNewTaskDueDate] = useState("");
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
   // Active Task Detail Drawer State
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [editingTitle, setEditingTitle] = useState("");
+  const [editingDescription, setEditingDescription] = useState("");
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
   // AI assistant loading state
   const [aiThinking, setAiThinking] = useState(false);
@@ -71,6 +76,35 @@ export default function TasksPage() {
       setNewTaskSection(sections[0].id);
     }
   }, [sections]);
+
+  useEffect(() => {
+    if (selectedTask) {
+      setEditingTitle(selectedTask.title);
+      setEditingDescription(selectedTask.description || "");
+    }
+  }, [selectedTask]);
+
+  const handleUpdateTitle = async () => {
+    if (!selectedTask || !editingTitle.trim() || editingTitle === selectedTask.title) return;
+    await updateTask(selectedTask.id, { title: editingTitle });
+    
+    const updated = useElphexStore.getState().tasks.find(t => t.id === selectedTask.id);
+    if (updated) setSelectedTask(updated);
+  };
+
+  const handleUpdateDescription = async () => {
+    if (!selectedTask || editingDescription === (selectedTask.description || "")) return;
+    await updateTask(selectedTask.id, { description: editingDescription });
+    
+    const updated = useElphexStore.getState().tasks.find(t => t.id === selectedTask.id);
+    if (updated) setSelectedTask(updated);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.currentTarget.blur();
+    }
+  };
 
   if (!mounted) return null;
 
@@ -94,8 +128,13 @@ export default function TasksPage() {
     e.preventDefault();
     if (!newTaskTitle.trim() || !activeProjectId || !newTaskSection) return;
     
-    await addTask(newTaskTitle, activeProjectId, newTaskSection);
+    await addTask(newTaskTitle, activeProjectId, newTaskSection, {
+      priority: newTaskPriority,
+      dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : null,
+    });
     setNewTaskTitle("");
+    setNewTaskPriority("MEDIUM");
+    setNewTaskDueDate("");
     setShowAddTaskModal(false);
   };
 
@@ -631,10 +670,23 @@ export default function TasksPage() {
 
                 {/* Task Meta Details */}
                 <div className="space-y-3">
-                  <h3 className="font-extrabold text-lg text-slate-100 leading-snug">{selectedTask.title}</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/20 p-3 rounded-xl border border-slate-900">
-                    {selectedTask.description || "Tidak ada deskripsi."}
-                  </p>
+                  <input
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={handleUpdateTitle}
+                    onKeyDown={handleTitleKeyDown}
+                    className="w-full bg-transparent border-0 border-b border-transparent hover:border-slate-850 focus:border-[#0085FF] focus:ring-0 font-extrabold text-lg text-slate-100 leading-snug p-0 focus:outline-none transition-colors"
+                    placeholder="Judul Tugas..."
+                  />
+                  <textarea
+                    value={editingDescription}
+                    onChange={(e) => setEditingDescription(e.target.value)}
+                    onBlur={handleUpdateDescription}
+                    rows={3}
+                    className="w-full bg-slate-950/10 hover:bg-slate-950/25 focus:bg-slate-950/30 text-xs text-slate-400 leading-relaxed p-3 rounded-xl border border-slate-900 focus:border-[#0085FF] focus:ring-0 focus:outline-none resize-none transition-colors"
+                    placeholder="Tambah deskripsi tugas di sini..."
+                  />
                   
                   <div className="flex flex-wrap gap-2 text-[10px] font-bold">
                     <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 uppercase">Prioritas: {selectedTask.priority}</span>
@@ -759,12 +811,7 @@ export default function TasksPage() {
                 {/* Footer Controls */}
                 <div className="mt-auto pt-4 flex gap-2">
                   <button 
-                    onClick={async () => {
-                      if (confirm("Apakah anda yakin ingin menghapus tugas ini?")) {
-                        await deleteTask(selectedTask.id);
-                        setSelectedTask(null);
-                      }
-                    }}
+                    onClick={() => setShowDeleteConfirmModal(true)}
                     className="flex-1 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-red-400 font-bold text-xs transition-colors cursor-pointer"
                   >
                     Hapus Tugas
@@ -813,15 +860,49 @@ export default function TasksPage() {
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Kolom / Tahapan</label>
+                      <select
+                        value={newTaskSection}
+                        onChange={(e) => setNewTaskSection(e.target.value)}
+                        className="glass-input w-full px-3 py-2 rounded-xl text-xs appearance-none"
+                      >
+                        {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Prioritas</label>
+                      <select
+                        value={newTaskPriority}
+                        onChange={(e) => setNewTaskPriority(e.target.value)}
+                        className="glass-input w-full px-3 py-2 rounded-xl text-xs appearance-none"
+                      >
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                        <option value="URGENT">URGENT</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Kolom / Tahapan</label>
-                    <select
-                      value={newTaskSection}
-                      onChange={(e) => setNewTaskSection(e.target.value)}
-                      className="glass-input w-full px-3 py-2 rounded-xl text-xs appearance-none"
-                    >
-                      {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Tenggat Waktu</label>
+                    <div className="relative">
+                      <input 
+                        type="date" 
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                        onClick={(e) => {
+                          try {
+                            e.currentTarget.showPicker();
+                          } catch (err) {}
+                        }}
+                        className="glass-input w-full pl-3 pr-10 py-2 rounded-xl text-xs cursor-pointer custom-date-input"
+                      />
+                      <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14} />
+                    </div>
                   </div>
 
                   <button 
@@ -831,6 +912,58 @@ export default function TasksPage() {
                     Buat Tugas
                   </button>
                 </form>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* Custom Delete Confirmation Modal */}
+        <AnimatePresence>
+          {showDeleteConfirmModal && selectedTask && (
+            <>
+              {/* Backdrop overlay */}
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowDeleteConfirmModal(false)}
+                className="fixed inset-0 bg-black/60 z-[60]"
+              />
+
+              {/* Modal Container */}
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="fixed inset-0 m-auto w-[90%] max-w-[380px] h-fit bg-slate-900 border border-slate-800 shadow-2xl p-6 rounded-2xl z-[70] space-y-4"
+              >
+                <div className="flex items-center space-x-3 text-red-500">
+                  <AlertTriangle size={20} className="shrink-0" />
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-slate-100">Hapus Tugas?</h3>
+                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Apakah Anda yakin ingin menghapus tugas <strong className="text-slate-200">"{selectedTask.title}"</strong>? Tindakan ini akan menghapus tugas secara permanen dari sistem.
+                </p>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => setShowDeleteConfirmModal(false)}
+                    className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 font-bold text-xs text-slate-300 transition-colors cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await deleteTask(selectedTask.id);
+                      setSelectedTask(null);
+                      setShowDeleteConfirmModal(false);
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 font-bold text-xs text-white shadow-lg shadow-red-500/20 transition-all cursor-pointer"
+                  >
+                    Ya, Hapus
+                  </button>
+                </div>
               </motion.div>
             </>
           )}
