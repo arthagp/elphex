@@ -45,6 +45,7 @@
 }
 
 :root {
+  color-scheme: light;
   /* Light Mode (Default variables when .dark class is NOT present) */
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -72,6 +73,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   /* Dark Mode */
   --background: #090e1a;
   --foreground: #f8fafc;
@@ -159,6 +161,12 @@ body {
   background: var(--glass-input-focus-bg);
   border-color: rgba(0, 133, 255, 0.5);
   box-shadow: 0 0 10px rgba(0, 133, 255, 0.2);
+}
+
+/* Fix native select option background and text colors */
+select option {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 /* Text glow effects - slightly reduced in light mode for readability */

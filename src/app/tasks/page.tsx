@@ -791,7 +791,7 @@ export default function TasksPage() {
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed inset-0 m-auto w-[90%] max-w-[420px] h-fit glass-panel border border-slate-800 shadow-2xl p-6 rounded-2xl z-50 space-y-4"
+                className="fixed inset-0 m-auto w-[90%] max-w-[420px] h-fit bg-slate-900 border border-slate-800 shadow-2xl p-6 rounded-2xl z-50 space-y-4"
               >
                 <div className="flex justify-between items-center">
                   <h3 className="font-extrabold text-sm text-slate-100 uppercase tracking-wider">Tambah Tugas Baru</h3>
@@ -820,7 +820,7 @@ export default function TasksPage() {
                       onChange={(e) => setNewTaskSection(e.target.value)}
                       className="glass-input w-full px-3 py-2 rounded-xl text-xs appearance-none"
                     >
-                      {sections.map(s => <option key={s.id} value={s.id} className="bg-[#0a0f1d]">{s.name}</option>)}
+                      {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
 

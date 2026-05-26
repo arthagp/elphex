@@ -181,9 +181,9 @@ export default function FocusPage() {
                 className="glass-input w-full px-3 py-2 rounded-xl text-xs"
                 disabled={pomodoro.isRunning}
               >
-                <option value="" className="bg-[#0a0f1d]">Fokus Umum (Bukan tugas spesifik)</option>
+                <option value="">Fokus Umum (Bukan tugas spesifik)</option>
                 {tasks.filter(t => t.status !== "DONE").map((t) => (
-                  <option key={t.id} value={t.id} className="bg-[#0a0f1d]">{t.title}</option>
+                  <option key={t.id} value={t.id}>{t.title}</option>
                 ))}
               </select>
             </div>
