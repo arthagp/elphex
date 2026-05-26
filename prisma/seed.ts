@@ -1,7 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+import crypto from "crypto";
+
+function hashPassword(password: string) {
+  return crypto.createHash("sha256").update(password).digest("hex");
+}
 
 async function main() {
-  console.log("Connecting to PostgreSQL database...");
+  console.log("Connecting to database...");
   const prisma = new PrismaClient();
 
   console.log("Seeding database...");
@@ -37,7 +42,11 @@ async function main() {
   const user = await prisma.user.create({
     data: {
       id: "usr_test",
-      email: "gamer@elphex.com",
+      email: "arthagusfi8@gmail.com",
+      passwordHash: hashPassword("Zunos123@"),
+      phone: "083848762736",
+      plan: "PRO",
+      isVerified: true,
     },
   });
 
@@ -53,7 +62,7 @@ async function main() {
   await prisma.profile.create({
     data: {
       userId: user.id,
-      name: "Arthur Pachyderm",
+      name: "Artha GP",
       avatarUrl: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=arthur",
       bio: "Gamer, builder, productivity seeker. Elephant never forgets!",
       timezone: "Asia/Jakarta",
@@ -78,59 +87,190 @@ async function main() {
     },
   });
 
-  // 4. Create Workspace
-  const workspace = await prisma.workspace.create({
+  // ==========================================
+  // 4. WORKSPACE 1: PERSONAL WORKSPACE
+  // ==========================================
+  console.log("Creating Personal Workspace...");
+  const personalWorkspace = await prisma.workspace.create({
     data: {
       id: "wsp_personal",
-      name: "Alpha Team Workspace",
-      slug: "alpha-team",
+      name: "Personal Workspace",
+      slug: "personal-space",
+      ownerId: user.id,
+      plan: "FREE",
+    },
+  });
+
+  await prisma.workspaceMember.create({
+    data: { workspaceId: personalWorkspace.id, userId: user.id, role: "OWNER" },
+  });
+
+  // Personal Labels
+  const lblSelfCare = await prisma.label.create({
+    data: { id: "lbl_p_selfcare", workspaceId: personalWorkspace.id, name: "Self-Care", color: "#10B981" },
+  });
+
+  const lblErrand = await prisma.label.create({
+    data: { id: "lbl_p_errand", workspaceId: personalWorkspace.id, name: "Belanja", color: "#F59E0B" },
+  });
+
+  // Personal Project
+  const personalProject = await prisma.project.create({
+    data: {
+      id: "prj_personal",
+      workspaceId: personalWorkspace.id,
+      name: "🏠 Personal Tasks",
+      color: "#10B981",
+      createdBy: user.id,
+    },
+  });
+
+  // Personal Sections (Custom board columns for personal tasks)
+  const secPTodo = await prisma.section.create({
+    data: { id: "sec_p_todo", projectId: personalProject.id, name: "To Do", position: 1.0 },
+  });
+
+  const secPDoing = await prisma.section.create({
+    data: { id: "sec_p_doing", projectId: personalProject.id, name: "In Progress", position: 2.0 },
+  });
+
+  const secPDone = await prisma.section.create({
+    data: { id: "sec_p_done", projectId: personalProject.id, name: "Completed", position: 3.0 },
+  });
+
+  // Personal Tasks
+  await prisma.task.create({
+    data: {
+      id: "tsk_p1",
+      title: "Beli bahan makanan & kebutuhan mingguan",
+      description: "Belanja sayur, buah, dan susu di supermarket terdekat.",
+      status: "TODO",
+      priority: "LOW",
+      projectId: personalProject.id,
+      sectionId: secPTodo.id,
+      createdBy: user.id,
+      position: 1.0,
+      dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
+    },
+  });
+
+  await prisma.task.create({
+    data: {
+      id: "tsk_p2",
+      title: "Olahraga pagi - Jogging 5 km",
+      description: "Jogging keliling kompleks perumahan untuk stamina.",
+      status: "DONE",
+      priority: "MEDIUM",
+      projectId: personalProject.id,
+      sectionId: secPDone.id,
+      createdBy: user.id,
+      position: 2.0,
+      dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+    },
+  });
+
+  await prisma.task.create({
+    data: {
+      id: "tsk_p3",
+      title: "Membaca buku 'Atomic Habits' 15 halaman",
+      description: "Fokus membaca untuk pengembangan kebiasaan baik.",
+      status: "IN_PROGRESS",
+      priority: "LOW",
+      projectId: personalProject.id,
+      sectionId: secPDoing.id,
+      createdBy: user.id,
+      position: 3.0,
+      dueDate: new Date(), // Today
+    },
+  });
+
+  // Connect Personal Task Labels
+  await prisma.taskLabel.createMany({
+    data: [
+      { taskId: "tsk_p1", labelId: lblErrand.id },
+      { taskId: "tsk_p2", labelId: lblSelfCare.id },
+      { taskId: "tsk_p3", labelId: lblSelfCare.id },
+    ],
+  });
+
+
+  // ==========================================
+  // 5. WORKSPACE 2: ORGANIZATION / TEAM WORKSPACE
+  // ==========================================
+  console.log("Creating Organization / Team Workspace...");
+  const teamWorkspace = await prisma.workspace.create({
+    data: {
+      id: "wsp_org_alpha",
+      name: "Alpha Organization",
+      slug: "alpha-org",
       ownerId: user.id,
       plan: "PRO",
     },
   });
 
-  // 5. Create Members
+  // Team Members
   await prisma.workspaceMember.createMany({
     data: [
-      { workspaceId: workspace.id, userId: user.id, role: "OWNER" },
-      { workspaceId: workspace.id, userId: member1.id, role: "ADMIN" },
-      { workspaceId: workspace.id, userId: member2.id, role: "MEMBER" },
+      { workspaceId: teamWorkspace.id, userId: user.id, role: "OWNER" },
+      { workspaceId: teamWorkspace.id, userId: member1.id, role: "ADMIN" },
+      { workspaceId: teamWorkspace.id, userId: member2.id, role: "MEMBER" },
     ],
   });
 
-  // 6. Create Project
-  const project = await prisma.project.create({
+  // Organization Labels
+  const lblFeature = await prisma.label.create({
+    data: { id: "lbl_feature", workspaceId: teamWorkspace.id, name: "Fitur Utama", color: "#0085FF" },
+  });
+
+  const lblBug = await prisma.label.create({
+    data: { id: "lbl_bug", workspaceId: teamWorkspace.id, name: "Bug S1", color: "#FF3B30" },
+  });
+
+  const lblEnhancement = await prisma.label.create({
+    data: { id: "lbl_enhancement", workspaceId: teamWorkspace.id, name: "Peningkatan", color: "#34C759" },
+  });
+
+  const lblDoc = await prisma.label.create({
+    data: { id: "lbl_doc", workspaceId: teamWorkspace.id, name: "Dokumentasi", color: "#FF9500" },
+  });
+
+  // Team Project
+  const teamProject = await prisma.project.create({
     data: {
       id: "prj_core",
-      workspaceId: workspace.id,
+      workspaceId: teamWorkspace.id,
       name: "🚀 Elphex Launch Sprint",
       color: "#0085FF",
       createdBy: user.id,
     },
   });
 
-  // 7. Create Sections
+  // Team Sections (Customized board columns for organization tasks)
   const secTodo = await prisma.section.create({
-    data: { id: "sec_todo", projectId: project.id, name: "To Do", position: 1.0 },
+    data: { id: "sec_todo", projectId: teamProject.id, name: "To Do", position: 1.0 },
   });
 
   const secDoing = await prisma.section.create({
-    data: { id: "sec_doing", projectId: project.id, name: "In Progress", position: 2.0 },
+    data: { id: "sec_doing", projectId: teamProject.id, name: "In Progress", position: 2.0 },
+  });
+
+  const secReview = await prisma.section.create({
+    data: { id: "sec_review", projectId: teamProject.id, name: "Ulasan / Uji", position: 3.0 },
   });
 
   const secDone = await prisma.section.create({
-    data: { id: "sec_done", projectId: project.id, name: "Completed", position: 3.0 },
+    data: { id: "sec_done", projectId: teamProject.id, name: "Completed", position: 4.0 },
   });
 
-  // 8. Create Tasks
-  const task1 = await prisma.task.create({
+  // Team Tasks
+  await prisma.task.create({
     data: {
       id: "tsk_1",
       title: "Initialize Next.js 15 & Setup Tailwind v4 CSS",
       description: "Setup folder structure, global glassmorphism colors, and base elements.",
       status: "DONE",
       priority: "HIGH",
-      projectId: project.id,
+      projectId: teamProject.id,
       sectionId: secDone.id,
       createdBy: user.id,
       position: 1.0,
@@ -138,14 +278,14 @@ async function main() {
     },
   });
 
-  const task2 = await prisma.task.create({
+  await prisma.task.create({
     data: {
       id: "tsk_2",
       title: "Implement Core Prisma Schema for SQLite",
       description: "Define entities for Tasks, Sprints, Subtasks, XP rules, and Elph Pets.",
       status: "DONE",
       priority: "URGENT",
-      projectId: project.id,
+      projectId: teamProject.id,
       sectionId: secDone.id,
       createdBy: user.id,
       position: 2.0,
@@ -153,14 +293,14 @@ async function main() {
     },
   });
 
-  const task3 = await prisma.task.create({
+  await prisma.task.create({
     data: {
       id: "tsk_3",
       title: "Build Zustand Store & UI Navigation Layout",
       description: "Create state management for level tracking, Pet feeding, and Pomodoro focus sessions.",
       status: "IN_PROGRESS",
       priority: "HIGH",
-      projectId: project.id,
+      projectId: teamProject.id,
       sectionId: secDoing.id,
       createdBy: user.id,
       position: 3.0,
@@ -168,14 +308,14 @@ async function main() {
     },
   });
 
-  const task4 = await prisma.task.create({
+  await prisma.task.create({
     data: {
       id: "tsk_4",
       title: "Integrate Vercel AI SDK 'Elephant Brain'",
       description: "Develop subtask decomposition assistant. Add fallbacks for local mock service.",
       status: "TODO",
       priority: "MEDIUM",
-      projectId: project.id,
+      projectId: teamProject.id,
       sectionId: secTodo.id,
       createdBy: user.id,
       position: 4.0,
@@ -183,14 +323,14 @@ async function main() {
     },
   });
 
-  const task5 = await prisma.task.create({
+  await prisma.task.create({
     data: {
       id: "tsk_5",
       title: "Deploy app to Vercel Hosting & Configure Sentry",
       description: "Setup continuous integration with GitHub actions and monitoring tools.",
       status: "TODO",
       priority: "LOW",
-      projectId: project.id,
+      projectId: teamProject.id,
       sectionId: secTodo.id,
       createdBy: user.id,
       position: 5.0,
@@ -198,7 +338,17 @@ async function main() {
     },
   });
 
-  // 9. Add Subtasks
+  // Connect Team Task Labels
+  await prisma.taskLabel.createMany({
+    data: [
+      { taskId: "tsk_1", labelId: lblFeature.id },
+      { taskId: "tsk_2", labelId: lblBug.id },
+      { taskId: "tsk_3", labelId: lblFeature.id },
+      { taskId: "tsk_4", labelId: lblFeature.id },
+    ],
+  });
+
+  // 9. Add Subtasks (for Team Tasks)
   await prisma.subtask.createMany({
     data: [
       { taskId: "tsk_3", title: "Write elphexStore.ts logic", isDone: true, position: 1.0 },
@@ -232,7 +382,7 @@ async function main() {
   await prisma.userXP.create({
     data: {
       userId: user.id,
-      totalXp: 450,
+      totalXp: 555,
       level: 4,
     },
   });
@@ -250,7 +400,7 @@ async function main() {
     data: {
       userId: user.id,
       name: "Elphy",
-      level: 2,
+      level: 3,
       mood: "HAPPY",
       color: "GREY",
     },
@@ -298,20 +448,20 @@ async function main() {
     },
   });
 
-  // 15. Leaderboard Entries
+  // 15. Leaderboard Entries (Linked to the Team Organization workspace)
   await prisma.leaderboardEntry.createMany({
     data: [
-      { workspaceId: workspace.id, userId: user.id, period: "WEEKLY", xp: 450, rank: 2 },
-      { workspaceId: workspace.id, userId: member1.id, period: "WEEKLY", xp: 620, rank: 1 },
-      { workspaceId: workspace.id, userId: member2.id, period: "WEEKLY", xp: 210, rank: 3 },
+      { workspaceId: teamWorkspace.id, userId: user.id, period: "WEEKLY", xp: 450, rank: 2 },
+      { workspaceId: teamWorkspace.id, userId: member1.id, period: "WEEKLY", xp: 620, rank: 1 },
+      { workspaceId: teamWorkspace.id, userId: member2.id, period: "WEEKLY", xp: 210, rank: 3 },
     ],
   });
 
-  // 16. Sprint
+  // 16. Sprint (Linked to the Team Project)
   await prisma.sprint.create({
     data: {
       id: "spr_1",
-      projectId: project.id,
+      projectId: teamProject.id,
       name: "Sprint 1: Core System & Gamification Engine",
       startDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // Started 2 days ago
       endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // Ends in 5 days

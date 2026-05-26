@@ -1,7 +1,25 @@
 import { NextResponse } from "next/server";
+import prisma from "@/lib/db";
+import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check user plan
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.plan !== "PRO") {
+      return NextResponse.json({ error: "Fitur AI Assistant hanya tersedia untuk akun PRO" }, { status: 403 });
+    }
+
     const { taskTitle, description, action } = await request.json();
 
     if (!taskTitle) {

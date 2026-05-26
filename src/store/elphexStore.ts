@@ -3,6 +3,8 @@ import { create } from "zustand";
 export interface UserProfile {
   id: string;
   email: string;
+  phone: string | null;
+  plan: string;
   name: string;
   avatarUrl: string | null;
   bio: string | null;
@@ -34,6 +36,26 @@ export interface Label {
   color: string;
 }
 
+export interface WorkspaceMember {
+  workspaceId: string;
+  userId: string;
+  role: string;
+  name: string;
+  avatarUrl: string;
+}
+
+export interface TaskAssignee {
+  userId: string;
+  user: {
+    id: string;
+    email: string;
+    profile: {
+      name: string;
+      avatarUrl: string | null;
+    } | null;
+  };
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -47,13 +69,24 @@ export interface Task {
   subtasks: Subtask[];
   labels: { label: Label }[];
   dependencies: { dependsOnTaskId: string; type: string }[];
+  assignees: TaskAssignee[];
+  calendarType: string;
 }
 
 export interface Project {
   id: string;
+  workspaceId: string;
   name: string;
   color: string;
   isArchived: boolean;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  ownerId: string;
+  plan: string;
 }
 
 export interface Section {
@@ -65,6 +98,7 @@ export interface Section {
 
 export interface Sprint {
   id: string;
+  projectId: string;
   name: string;
   startDate: string;
   endDate: string;
@@ -74,6 +108,7 @@ export interface Sprint {
 export interface LeaderboardEntry {
   id: string;
   userId: string;
+  workspaceId: string;
   userName: string;
   userAvatar: string;
   xp: number;
@@ -127,6 +162,9 @@ interface ElphexStore {
   achievements: Achievement[];
   pomodoro: PomodoroState;
   xpNotification: XpNotification;
+  workspaces: Workspace[];
+  members: WorkspaceMember[];
+  activeWorkspaceId: string | null;
   activeProjectId: string | null;
   activeView: "kanban" | "list" | "timeline" | "calendar" | "table";
   isLoading: boolean;
@@ -134,8 +172,8 @@ interface ElphexStore {
 
   // Actions
   fetchInitialData: () => Promise<void>;
-  addTask: (title: string, projectId: string, sectionId: string, options?: Partial<Task>) => Promise<void>;
-  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  addTask: (title: string, projectId: string, sectionId: string, options?: Partial<Task> & { assigneeId?: string }) => Promise<void>;
+  updateTask: (taskId: string, updates: Partial<Task> & { assigneeId?: string | null }) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   toggleTaskStatus: (taskId: string) => Promise<void>;
   
@@ -153,12 +191,16 @@ interface ElphexStore {
   changeAmbientSound: (sound: string) => void;
 
   purchaseReward: (rewardId: string) => Promise<boolean>;
+  setActiveWorkspaceId: (workspaceId: string | null) => void;
   setActiveProjectId: (projectId: string | null) => void;
   setActiveView: (view: ElphexStore["activeView"]) => void;
   hideXpNotification: () => void;
   toggleTheme: () => void;
   moveTaskStatus: (taskId: string, targetStatus: string) => Promise<void>;
   showXpGain: (amount: number, message: string, isLevelUp?: boolean) => void;
+  logout: () => Promise<void>;
+  updateUserPlan: (plan: string) => void;
+  addWorkspace: (name: string) => Promise<void>;
 }
 
 export const useElphexStore = create<ElphexStore>((set, get) => ({
@@ -174,6 +216,9 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
   purchasedRewards: [],
   achievements: [],
   isLoading: true,
+  workspaces: [],
+  members: [],
+  activeWorkspaceId: null,
   activeProjectId: null,
   activeView: "kanban",
   theme: "dark",
@@ -194,9 +239,21 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
       const res = await fetch("/api/init");
       if (res.ok) {
         const data = await res.json();
+        const currentActiveWorkspaceId = get().activeWorkspaceId;
+        const currentActiveProjectId = get().activeProjectId;
+        
+        const workspaceExists = data.workspaces.some((w: any) => w.id === currentActiveWorkspaceId);
+        const newActiveWorkspaceId = workspaceExists ? currentActiveWorkspaceId : (data.workspaces[0]?.id || null);
+        
+        const projectExists = data.projects.some((p: any) => p.id === currentActiveProjectId && p.workspaceId === newActiveWorkspaceId);
+        const newActiveProjectId = projectExists ? currentActiveProjectId : (data.projects.find((p: any) => p.workspaceId === newActiveWorkspaceId)?.id || null);
+
         set({
           user: data.user,
           pet: data.pet,
+          workspaces: data.workspaces,
+          members: data.members,
+          activeWorkspaceId: newActiveWorkspaceId,
           tasks: data.tasks,
           projects: data.projects,
           sections: data.sections,
@@ -205,8 +262,10 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
           rewardItems: data.rewardItems,
           purchasedRewards: data.purchasedRewards,
           achievements: data.achievements,
-          activeProjectId: data.projects[0]?.id || null,
+          activeProjectId: newActiveProjectId,
         });
+      } else if (res.status === 401) {
+        window.location.href = "/login";
       }
     } catch (error) {
       console.error("Failed to fetch initial data", error);
@@ -520,6 +579,14 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
   },
 
   setActiveProjectId: (projectId) => set({ activeProjectId: projectId }),
+  setActiveWorkspaceId: (workspaceId) => {
+    const state = get();
+    const firstProject = state.projects.find((p) => p.workspaceId === workspaceId);
+    set({
+      activeWorkspaceId: workspaceId,
+      activeProjectId: firstProject?.id || null,
+    });
+  },
   setActiveView: (view) => set({ activeView: view }),
 
   hideXpNotification: () =>
@@ -598,6 +665,55 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
           origin: { y: 0.6 },
         });
       });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+      set({
+        user: null,
+        pet: null,
+        tasks: [],
+        projects: [],
+        sections: [],
+        activeSprint: null,
+        leaderboard: [],
+        workspaces: [],
+        activeWorkspaceId: null,
+        activeProjectId: null,
+      });
+      window.location.href = "/login";
+    } catch (e) {
+      console.error("Error signing out", e);
+    }
+  },
+
+  updateUserPlan: (plan: string) => {
+    set((state) => ({
+      user: state.user ? { ...state.user, plan } : null,
+    }));
+  },
+
+  addWorkspace: async (name: string) => {
+    try {
+      const res = await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const newWorkspace = await res.json();
+        set((state) => ({
+          workspaces: [...state.workspaces, newWorkspace],
+          activeWorkspaceId: newWorkspace.id,
+        }));
+        get().showXpGain(30, "Organisasi Baru Dibuat!");
+        // Reload all data so the new projects and sections from the workspace are active
+        await get().fetchInitialData();
+      }
+    } catch (error) {
+      console.error("Error creating workspace", error);
     }
   },
 }));

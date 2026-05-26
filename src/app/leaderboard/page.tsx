@@ -27,7 +27,7 @@ const taskContribution = [
 ];
 
 export default function LeaderboardPage() {
-  const { leaderboard, user } = useElphexStore();
+  const { leaderboard, user, activeWorkspaceId } = useElphexStore();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -35,6 +35,11 @@ export default function LeaderboardPage() {
   }, []);
 
   if (!mounted || !user) return null;
+
+  const workspaceLeaderboard = leaderboard
+    .filter((entry) => entry.workspaceId === activeWorkspaceId)
+    .sort((a, b) => b.xp - a.xp)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   return (
     <AppLayout>
@@ -56,7 +61,7 @@ export default function LeaderboardPage() {
             </div>
 
             <div className="space-y-3">
-              {leaderboard.map((entry, idx) => {
+              {workspaceLeaderboard.map((entry, idx) => {
                 const isMe = entry.userId === user.id;
                 
                 // Rank Styling

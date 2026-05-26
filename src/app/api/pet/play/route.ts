@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { cookies } from "next/headers";
 
 export async function POST() {
   try {
-    const userId = "usr_test";
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const pet = await prisma.elphPet.findUnique({ where: { userId } });
     if (!pet) {

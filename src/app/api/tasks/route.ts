@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
   try {
-    const userId = "usr_test";
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const body = await request.json();
-    const { title, projectId, sectionId, priority, dueDate } = body;
+    const { title, projectId, sectionId, priority, dueDate, assigneeId } = body;
 
     if (!title || !projectId || !sectionId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -29,11 +35,27 @@ export async function POST(request: Request) {
         sectionId,
         createdBy: userId,
         position: nextPosition,
+        assignees: assigneeId
+          ? {
+              create: {
+                userId: assigneeId,
+              },
+            }
+          : undefined,
       },
       include: {
         subtasks: true,
         labels: { include: { label: true } },
         dependencies: { select: { dependsOnTaskId: true, type: true } },
+        assignees: {
+          include: {
+            user: {
+              include: {
+                profile: true,
+              },
+            },
+          },
+        },
       },
     });
 

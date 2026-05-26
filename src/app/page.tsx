@@ -54,7 +54,12 @@ export default function Home() {
 }
 
 function DashboardContent({ user, pet }: { user: any; pet: any }) {
-  const { tasks, achievements, leaderboard, startPomodoro, toggleTaskStatus } = useElphexStore();
+  const { tasks, achievements, leaderboard, activeWorkspaceId, startPomodoro, toggleTaskStatus } = useElphexStore();
+
+  const workspaceLeaderboard = leaderboard
+    .filter((entry) => entry.workspaceId === activeWorkspaceId)
+    .sort((a, b) => b.xp - a.xp)
+    .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   const title = getLevelTitle(user.level);
   const activeTasks = tasks.filter((t) => t.status !== "DONE").slice(0, 3);
@@ -266,7 +271,7 @@ function DashboardContent({ user, pet }: { user: any; pet: any }) {
             </div>
 
             <div className="space-y-3">
-              {leaderboard.slice(0, 3).map((entry, idx) => (
+              {workspaceLeaderboard.slice(0, 3).map((entry, idx) => (
                 <div key={entry.id} className={`p-3 rounded-xl border flex items-center justify-between ${
                   entry.userId === user.id 
                     ? "bg-[#0085FF]/10 border-[#0085FF]/20" 

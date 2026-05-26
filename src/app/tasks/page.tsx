@@ -3,6 +3,7 @@
 import AppLayout from "@/components/layout/AppLayout";
 import { useElphexStore, Task, Subtask } from "@/store/elphexStore";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { 
   Kanban, 
   List, 
@@ -21,16 +22,20 @@ import {
   CheckSquare,
   Search,
   SlidersHorizontal,
-  X
+  X,
+  Lock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function TasksPage() {
   const { 
+    user,
     tasks, 
     projects, 
     sections, 
     activeProjectId, 
+    setActiveProjectId,
+    activeWorkspaceId,
     activeView, 
     setActiveView, 
     addTask, 
@@ -41,7 +46,8 @@ export default function TasksPage() {
     toggleSubtask,
     deleteSubtask,
     showXpGain,
-    moveTaskStatus
+    moveTaskStatus,
+    members
   } = useElphexStore();
 
   const [mounted, setMounted] = useState(false);
@@ -57,6 +63,7 @@ export default function TasksPage() {
   const [newTaskSection, setNewTaskSection] = useState("");
   const [newTaskPriority, setNewTaskPriority] = useState("MEDIUM");
   const [newTaskDueDate, setNewTaskDueDate] = useState("");
+  const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
 
   // Active Task Detail Drawer State
@@ -72,10 +79,11 @@ export default function TasksPage() {
 
   useEffect(() => {
     setMounted(true);
-    if (sections.length > 0) {
-      setNewTaskSection(sections[0].id);
+    const firstSection = sections.find((s) => s.projectId === activeProjectId);
+    if (firstSection) {
+      setNewTaskSection(firstSection.id);
     }
-  }, [sections]);
+  }, [sections, activeProjectId]);
 
   useEffect(() => {
     if (selectedTask) {
@@ -83,6 +91,10 @@ export default function TasksPage() {
       setEditingDescription(selectedTask.description || "");
     }
   }, [selectedTask]);
+
+  const workspaceProjects = projects.filter((p) => p.workspaceId === activeWorkspaceId);
+  const workspaceMembers = members.filter((m) => m.workspaceId === activeWorkspaceId);
+  const projectSections = sections.filter((s) => s.projectId === activeProjectId);
 
   const handleUpdateTitle = async () => {
     if (!selectedTask || !editingTitle.trim() || editingTitle === selectedTask.title) return;
@@ -131,10 +143,12 @@ export default function TasksPage() {
     await addTask(newTaskTitle, activeProjectId, newTaskSection, {
       priority: newTaskPriority,
       dueDate: newTaskDueDate ? new Date(newTaskDueDate).toISOString() : null,
+      assigneeId: newTaskAssignee || undefined,
     });
     setNewTaskTitle("");
     setNewTaskPriority("MEDIUM");
     setNewTaskDueDate("");
+    setNewTaskAssignee("");
     setShowAddTaskModal(false);
   };
 
@@ -206,13 +220,34 @@ export default function TasksPage() {
             <p className="text-xs text-slate-500 font-medium">Kelola dan selesaikan tugas-tugas tim di sini.</p>
           </div>
           
-          <button 
-            onClick={() => setShowAddTaskModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-[#0085FF] hover:bg-blue-600 font-bold text-xs shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
-          >
-            <Plus size={16} />
-            <span>Tugas Baru</span>
-          </button>
+          <div className="flex items-center space-x-3">
+            {workspaceProjects.length > 0 && (
+              <select
+                value={activeProjectId || ""}
+                onChange={(e) => setActiveProjectId(e.target.value)}
+                className="glass-input px-3 py-1.5 rounded-xl text-xs font-semibold appearance-none bg-slate-900 border border-slate-800"
+              >
+                {workspaceProjects.map((p) => (
+                  <option key={p.id} value={p.id} className="bg-white dark:bg-[#0a0f1d] text-slate-900 dark:text-slate-100">
+                    📂 {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            
+            <button 
+              onClick={() => {
+                if (projectSections.length > 0) {
+                  setNewTaskSection(projectSections[0].id);
+                }
+                setShowAddTaskModal(true);
+              }}
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-[#0085FF] hover:bg-blue-600 font-bold text-xs shadow-lg shadow-blue-500/20 transition-all cursor-pointer shrink-0"
+            >
+              <Plus size={16} />
+              <span>Tugas Baru</span>
+            </button>
+          </div>
         </div>
 
         {/* View Switcher and Search Row */}
@@ -368,15 +403,26 @@ export default function TasksPage() {
                             <h5 className="font-bold text-xs text-slate-200 line-clamp-2">{task.title}</h5>
                             
                             <div className="flex items-center justify-between mt-3">
-                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold border ${
-                                task.priority === "URGENT" 
-                                  ? "bg-red-500/10 border-red-500/20 text-red-400" 
-                                  : task.priority === "HIGH" 
-                                    ? "bg-orange-500/10 border-orange-500/20 text-orange-400" 
-                                    : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                              }`}>
-                                {task.priority}
-                              </span>
+                              <div className="flex items-center space-x-2">
+                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold border ${
+                                  task.priority === "URGENT" 
+                                    ? "bg-red-500/10 border-red-500/20 text-red-400" 
+                                    : task.priority === "HIGH" 
+                                      ? "bg-orange-500/10 border-orange-500/20 text-orange-400" 
+                                      : "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                                }`}>
+                                  {task.priority}
+                                </span>
+
+                                {task.assignees?.[0] && (
+                                  <img 
+                                    src={task.assignees[0].user?.profile?.avatarUrl || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${task.assignees[0].userId}`}
+                                    alt={task.assignees[0].user?.profile?.name || "PIC"}
+                                    className="w-5 h-5 rounded-full border border-slate-750 bg-slate-850"
+                                    title={task.assignees[0].user?.profile?.name || "PIC"}
+                                  />
+                                )}
+                              </div>
 
                               {status !== "DONE" && (
                                 <button 
@@ -404,7 +450,7 @@ export default function TasksPage() {
           {/* 2. LIST VIEW */}
           {activeView === "list" && (
             <div className="p-6 rounded-2xl bg-slate-900/10 border border-slate-800/20 space-y-6">
-              {sections.map((sec) => {
+              {projectSections.map((sec) => {
                 const sectionTasks = filteredTasks.filter((t) => t.sectionId === sec.id);
                 return (
                   <div key={sec.id} className="space-y-3">
@@ -446,6 +492,19 @@ export default function TasksPage() {
                             </div>
 
                             <div className="flex items-center space-x-3 shrink-0">
+                              {task.assignees?.[0] && (
+                                <div className="flex items-center space-x-1.5 bg-slate-950/40 px-2 py-0.5 rounded-lg border border-slate-850">
+                                  <img 
+                                    src={task.assignees[0].user?.profile?.avatarUrl || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${task.assignees[0].userId}`}
+                                    alt={task.assignees[0].user?.profile?.name || "PIC"}
+                                    className="w-4 h-4 rounded-full border border-slate-700 bg-slate-800"
+                                  />
+                                  <span className="text-[9px] text-slate-400 font-semibold max-w-[80px] truncate">
+                                    {task.assignees[0].user?.profile?.name || "PIC"}
+                                  </span>
+                                </div>
+                              )}
+                              
                               <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold border ${
                                 task.priority === "URGENT" 
                                   ? "bg-red-500/10 border-red-500/20 text-red-400" 
@@ -582,6 +641,7 @@ export default function TasksPage() {
                 <thead>
                   <tr className="border-b border-slate-800/60 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                     <th className="pb-3">Judul Tugas</th>
+                    <th className="pb-3">PIC</th>
                     <th className="pb-3">Status</th>
                     <th className="pb-3">Prioritas</th>
                     <th className="pb-3">Tenggat Waktu</th>
@@ -591,7 +651,7 @@ export default function TasksPage() {
                 <tbody>
                   {filteredTasks.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-6 text-slate-500">Tidak ada tugas.</td>
+                      <td colSpan={6} className="text-center py-6 text-slate-500">Tidak ada tugas.</td>
                     </tr>
                   ) : (
                     filteredTasks.map((task) => {
@@ -603,6 +663,22 @@ export default function TasksPage() {
                           className="border-b border-slate-900/40 hover:bg-slate-900/40 cursor-pointer"
                         >
                           <td className="py-3.5 font-bold text-slate-300">{task.title}</td>
+                          <td>
+                            {task.assignees?.[0] ? (
+                              <div className="flex items-center space-x-1.5">
+                                <img 
+                                  src={task.assignees[0].user?.profile?.avatarUrl || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${task.assignees[0].userId}`}
+                                  alt={task.assignees[0].user?.profile?.name || "PIC"}
+                                  className="w-4 h-4 rounded-full border border-slate-700 bg-slate-800"
+                                />
+                                <span className="text-[10px] text-slate-400 font-semibold">
+                                  {task.assignees[0].user?.profile?.name || "PIC"}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-medium italic">Belum ditunjuk</span>
+                            )}
+                          </td>
                           <td>
                             <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
                               task.status === "DONE" ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"
@@ -695,6 +771,68 @@ export default function TasksPage() {
                       <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">Tenggat: {new Date(selectedTask.dueDate).toLocaleDateString("id-ID")}</span>
                     )}
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">PIC / Penerima Tugas</label>
+                    <div className="flex items-center space-x-3 mt-1 p-2 rounded-xl bg-slate-900/50 border border-slate-850">
+                      {(() => {
+                        const currentAssigneeId = selectedTask.assignees?.[0]?.userId;
+                        const currentMember = workspaceMembers.find(m => m.userId === currentAssigneeId);
+                        const avatarUrl = currentMember?.avatarUrl || "https://api.dicebear.com/7.x/fun-emoji/svg?seed=unassigned";
+                        return (
+                          <img 
+                            src={avatarUrl} 
+                            alt="PIC" 
+                            className="w-8 h-8 rounded-full border border-slate-700 bg-slate-800 shrink-0" 
+                          />
+                        );
+                      })()}
+                      
+                      <select
+                        value={selectedTask.assignees?.[0]?.userId || ""}
+                        onChange={async (e) => {
+                          const newAssigneeId = e.target.value || null;
+                          await updateTask(selectedTask.id, { assigneeId: newAssigneeId });
+                          // Refresh selected task reference in drawer
+                          const updated = useElphexStore.getState().tasks.find(t => t.id === selectedTask.id);
+                          if (updated) setSelectedTask(updated);
+                        }}
+                        className="glass-input flex-1 px-2.5 py-1 rounded-lg text-xs appearance-none bg-transparent border-0 focus:ring-0 cursor-pointer"
+                      >
+                        <option value="" className="bg-[#0a0f1d] text-slate-200">Belum ditunjuk</option>
+                        {workspaceMembers.map(m => (
+                          <option key={m.userId} value={m.userId} className="bg-[#0a0f1d] text-slate-200">{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {!activeWorkspaceId?.includes("personal") && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Integrasi Kalender</label>
+                      <div className="flex items-center space-x-3 mt-1 p-2 rounded-xl bg-slate-900/50 border border-slate-850">
+                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                          {selectedTask.calendarType === "GOOGLE" ? "📅" : selectedTask.calendarType === "LOOYAL" ? "🚀" : "❌"}
+                        </div>
+                        <select
+                          value={selectedTask.calendarType || "NONE"}
+                          onChange={async (e) => {
+                            const newCalType = e.target.value;
+                            await updateTask(selectedTask.id, { calendarType: newCalType });
+                            // Refresh selected task reference in drawer
+                            const updated = useElphexStore.getState().tasks.find(t => t.id === selectedTask.id);
+                            if (updated) setSelectedTask(updated);
+                            showXpGain(15, `Kalender tersinkronisasi ke ${newCalType === "NONE" ? "Tidak Ada" : newCalType}!`);
+                          }}
+                          className="glass-input flex-1 px-2.5 py-1 rounded-lg text-xs appearance-none bg-transparent border-0 focus:ring-0 cursor-pointer text-slate-300 font-semibold"
+                        >
+                          <option value="NONE" className="bg-[#0a0f1d] text-slate-200">❌ Tidak tersambung</option>
+                          <option value="GOOGLE" className="bg-[#0a0f1d] text-slate-200">📅 Google Calendar (Tim)</option>
+                          <option value="LOOYAL" className="bg-[#0a0f1d] text-slate-200">🚀 Looyal Calendar (Tim)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <hr className="border-slate-800/40" />
@@ -761,50 +899,73 @@ export default function TasksPage() {
                   <div className="flex gap-2">
                     <button 
                       onClick={() => triggerAiAction("breakdown")}
-                      disabled={aiThinking}
-                      className="flex-1 py-1.5 rounded-lg bg-[#0085FF]/10 border border-[#0085FF]/20 hover:bg-[#0085FF]/20 text-[#0085FF] font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                      disabled={aiThinking || user?.plan !== "PRO"}
+                      className="flex-1 py-1.5 rounded-lg bg-[#0085FF]/10 border border-[#0085FF]/20 hover:bg-[#0085FF]/20 text-[#0085FF] font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
                     >
-                      Pecah Subtugas
+                      {user?.plan !== "PRO" && <Lock size={10} className="text-[#0085FF]" />}
+                      <span>Pecah Subtugas</span>
                     </button>
                     <button 
                       onClick={() => triggerAiAction("estimate")}
-                      disabled={aiThinking}
-                      className="flex-1 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 hover:bg-slate-700 text-slate-300 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                      disabled={aiThinking || user?.plan !== "PRO"}
+                      className="flex-1 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 hover:bg-slate-700 text-slate-300 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
                     >
-                      Estimasi Jam
+                      {user?.plan !== "PRO" && <Lock size={10} className="text-slate-400" />}
+                      <span>Estimasi Jam</span>
                     </button>
                     <button 
                       onClick={() => triggerAiAction("prioritize")}
-                      disabled={aiThinking}
-                      className="flex-1 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 hover:bg-slate-700 text-slate-300 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50"
+                      disabled={aiThinking || user?.plan !== "PRO"}
+                      className="flex-1 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700 hover:bg-slate-700 text-slate-300 font-bold text-[10px] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1"
                     >
-                      Rekomendasi Prioritas
+                      {user?.plan !== "PRO" && <Lock size={10} className="text-slate-400" />}
+                      <span>Prioritas</span>
                     </button>
                   </div>
 
-                  {/* AI Results Output */}
-                  {aiThinking && (
-                    <div className="flex items-center space-x-2 py-2 justify-center text-xs text-slate-400">
-                      <span className="animate-bounce">🐘</span>
-                      <span>Gajah sedang berfikir...</span>
+                  {user?.plan !== "PRO" ? (
+                    <div className="p-3.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-slate-300 space-y-2.5 font-sans">
+                      <div className="flex items-center space-x-2 text-amber-400 font-bold text-[10px]">
+                        <Lock size={12} className="animate-pulse" />
+                        <span>FITUR AI EKSKLUSIF PRO</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Upgrade ke plan **PRO** untuk mengaktifkan AI Assistant yang memecah subtugas otomatis, menghitung estimasi pengerjaan, dan memberi rekomendasi prioritas tugas Anda.
+                      </p>
+                      <Link 
+                        href="/payment"
+                        className="inline-flex items-center justify-center w-full py-1.5 rounded-lg bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-950 font-bold text-[10px] transition-all cursor-pointer shadow-md shadow-amber-500/10"
+                      >
+                        Beralih ke PRO Sekarang
+                      </Link>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {/* AI Results Output */}
+                      {aiThinking && (
+                        <div className="flex items-center space-x-2 py-2 justify-center text-xs text-slate-400">
+                          <span className="animate-bounce">🐘</span>
+                          <span>Gajah sedang berfikir...</span>
+                        </div>
+                      )}
 
-                  {aiResult && (
-                    <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-900 text-[11px] text-slate-300 space-y-2 leading-relaxed">
-                      {aiResult.estimatedHours && (
-                        <p>⏱️ **Estimasi Waktu:** {aiResult.estimatedHours} jam (Kompleksitas: {aiResult.complexity})</p>
+                      {aiResult && (
+                        <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-900 text-[11px] text-slate-300 space-y-2 leading-relaxed">
+                          {aiResult.estimatedHours && (
+                            <p>⏱️ **Estimasi Waktu:** {aiResult.estimatedHours} jam (Kompleksitas: {aiResult.complexity})</p>
+                          )}
+                          {aiResult.suggestedPriority && (
+                            <p>⚠️ **Saran Prioritas:** {aiResult.suggestedPriority}</p>
+                          )}
+                          {aiResult.reasoning && (
+                            <p>**Analisis:** {aiResult.reasoning}</p>
+                          )}
+                          {aiResult.advice && (
+                            <p className="text-cyan-400 italic">"{aiResult.advice}"</p>
+                          )}
+                        </div>
                       )}
-                      {aiResult.suggestedPriority && (
-                        <p>⚠️ **Saran Prioritas:** {aiResult.suggestedPriority}</p>
-                      )}
-                      {aiResult.reasoning && (
-                        <p>**Analisis:** {aiResult.reasoning}</p>
-                      )}
-                      {aiResult.advice && (
-                        <p className="text-cyan-400 italic">"{aiResult.advice}"</p>
-                      )}
-                    </div>
+                    </>
                   )}
                 </div>
 
@@ -868,7 +1029,7 @@ export default function TasksPage() {
                         onChange={(e) => setNewTaskSection(e.target.value)}
                         className="glass-input w-full px-3 py-2 rounded-xl text-xs appearance-none"
                       >
-                        {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        {projectSections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
                     </div>
 
@@ -903,6 +1064,20 @@ export default function TasksPage() {
                       />
                       <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={14} />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">PIC / Penerima Tugas</label>
+                    <select
+                      value={newTaskAssignee}
+                      onChange={(e) => setNewTaskAssignee(e.target.value)}
+                      className="glass-input w-full px-3 py-2 rounded-xl text-xs appearance-none"
+                    >
+                      <option value="" className="bg-[#0a0f1d] text-slate-200">Belum ditunjuk</option>
+                      {workspaceMembers.map(m => (
+                        <option key={m.userId} value={m.userId} className="bg-[#0a0f1d] text-slate-200">{m.name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <button 

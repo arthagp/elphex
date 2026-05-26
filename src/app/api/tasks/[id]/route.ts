@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { cookies } from "next/headers";
 
 export async function PATCH(
   request: Request,
@@ -8,7 +9,12 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const userId = "usr_test";
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Build update object
     const updateData: any = {};
@@ -19,6 +25,21 @@ export async function PATCH(
     if (body.dueDate !== undefined) updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
     if (body.position !== undefined) updateData.position = body.position;
     if (body.sectionId !== undefined) updateData.sectionId = body.sectionId;
+    if (body.calendarType !== undefined) updateData.calendarType = body.calendarType;
+
+    if (body.assigneeId !== undefined) {
+      await prisma.taskAssignee.deleteMany({
+        where: { taskId: id },
+      });
+      if (body.assigneeId) {
+        await prisma.taskAssignee.create({
+          data: {
+            taskId: id,
+            userId: body.assigneeId,
+          },
+        });
+      }
+    }
 
     const updatedTask = await prisma.task.update({
       where: { id },
@@ -27,6 +48,15 @@ export async function PATCH(
         subtasks: { orderBy: { position: "asc" } },
         labels: { include: { label: true } },
         dependencies: { select: { dependsOnTaskId: true, type: true } },
+        assignees: {
+          include: {
+            user: {
+              include: {
+                profile: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -53,7 +83,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const userId = "usr_test";
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Soft delete
     const deletedTask = await prisma.task.update({

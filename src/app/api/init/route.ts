@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getLevelTitle } from "@/lib/gameEngine";
+import { cookies } from "next/headers";
 
 export async function GET() {
   try {
-    const userId = "usr_test"; // Dev mode fallback user
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // 1. Fetch user & profile
     const userRecord = await prisma.user.findUnique({
@@ -43,10 +49,29 @@ export async function GET() {
       where: { members: { some: { userId } } },
     });
 
-    const activeWorkspaceId = workspaces[0]?.id || "wsp_personal";
+    const workspaceIds = workspaces.map((w) => w.id);
+
+    const workspaceMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId: { in: workspaceIds } },
+      include: {
+        user: {
+          include: {
+            profile: true
+          }
+        }
+      }
+    });
+
+    const members = workspaceMembers.map((member) => ({
+      workspaceId: member.workspaceId,
+      userId: member.userId,
+      role: member.role,
+      name: member.user.profile?.name || "Unknown Ranger",
+      avatarUrl: member.user.profile?.avatarUrl || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${member.userId}`,
+    }));
 
     const projects = await prisma.project.findMany({
-      where: { workspaceId: activeWorkspaceId, isArchived: false },
+      where: { workspaceId: { in: workspaceIds }, isArchived: false },
     });
 
     const projectIds = projects.map((p) => p.id);
@@ -67,6 +92,15 @@ export async function GET() {
         subtasks: { orderBy: { position: "asc" } },
         labels: { include: { label: true } },
         dependencies: { select: { dependsOnTaskId: true, type: true } },
+        assignees: {
+          include: {
+            user: {
+              include: {
+                profile: true
+              }
+            }
+          }
+        }
       },
       orderBy: { position: "asc" },
     });
@@ -79,7 +113,7 @@ export async function GET() {
 
     // 7. Fetch Leaderboard (Weekly)
     const leaderboardRaw = await prisma.leaderboardEntry.findMany({
-      where: { workspaceId: activeWorkspaceId, period: "WEEKLY" },
+      where: { workspaceId: { in: workspaceIds }, period: "WEEKLY" },
       include: {
         user: {
           include: {
@@ -94,6 +128,7 @@ export async function GET() {
     const leaderboard = leaderboardRaw.map((entry) => ({
       id: entry.id,
       userId: entry.userId,
+      workspaceId: entry.workspaceId,
       userName: entry.user.profile?.name || "Unknown Ranger",
       userAvatar: entry.user.profile?.avatarUrl || "https://api.dicebear.com/7.x/fun-emoji/svg?seed=fallback",
       xp: entry.xp,
@@ -136,6 +171,7 @@ export async function GET() {
       totalXp: xpRecord.totalXp,
       currentStreak: streakRecord.currentStreak,
       longestStreak: streakRecord.longestStreak,
+      plan: userRecord.plan,
     };
 
     return NextResponse.json({
@@ -147,6 +183,8 @@ export async function GET() {
         color: petRecord.color,
         lastFedAt: petRecord.lastFedAt.toISOString(),
       },
+      workspaces,
+      members,
       projects,
       sections,
       tasks,

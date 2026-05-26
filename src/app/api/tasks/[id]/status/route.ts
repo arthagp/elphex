@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getLevelFromXp, checkAndUnlockAchievements } from "@/lib/gameEngine";
+import { cookies } from "next/headers";
 
 export async function PATCH(
   request: Request,
@@ -9,7 +10,12 @@ export async function PATCH(
   try {
     const { id } = await params;
     const { status } = await request.json();
-    const userId = "usr_test";
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("elphex-session")?.value;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     if (!status) {
       return NextResponse.json({ error: "Missing status" }, { status: 400 });
