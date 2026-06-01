@@ -12,6 +12,7 @@ export interface UserProfile {
   totalXp: number;
   currentStreak: number;
   longestStreak: number;
+  username: string; // Added field
 }
 
 export interface ElphPetState {
@@ -32,6 +33,7 @@ export interface Subtask {
 
 export interface Label {
   id: string;
+  workspaceId: string;
   name: string;
   color: string;
 }
@@ -56,13 +58,31 @@ export interface TaskAssignee {
   };
 }
 
+export interface CustomFieldDefinition {
+  id: string;
+  projectId: string;
+  name: string;
+  type: string; // TEXT, NUMBER, DROPDOWN
+  options: string | null;
+}
+
+export interface TaskCustomFieldValue {
+  id: string;
+  taskId: string;
+  fieldId: string;
+  value: string;
+  field: CustomFieldDefinition;
+}
+
 export interface Task {
   id: string;
   title: string;
   description: string | null;
   status: string; // TODO, IN_PROGRESS, REVIEW, DONE
   priority: string; // LOW, MEDIUM, HIGH, URGENT
+  startDate: string | null; // Added field
   dueDate: string | null;
+  dueDateReminder: string; // Added field
   projectId: string;
   sectionId: string;
   position: number;
@@ -70,6 +90,7 @@ export interface Task {
   labels: { label: Label }[];
   dependencies: { dependsOnTaskId: string; type: string }[];
   assignees: TaskAssignee[];
+  customFieldValues: TaskCustomFieldValue[]; // Added field
   calendarType: string;
 }
 
@@ -79,6 +100,7 @@ export interface Project {
   name: string;
   color: string;
   isArchived: boolean;
+  customFieldDefs?: CustomFieldDefinition[]; // Added field
 }
 
 export interface Workspace {
@@ -132,6 +154,34 @@ export interface Achievement {
   unlockedAt: string | null;
 }
 
+export interface TaskTemplate {
+  id: string;
+  name: string;
+  projectId: string;
+  title: string;
+  description: string | null;
+  priority: string;
+  labels: string | null;
+  assigneeId: string | null;
+  customFields: string | null;
+}
+
+export interface BoardInvitation {
+  id: string;
+  projectId: string;
+  inviteeId: string;
+  inviterId: string;
+  status: string;
+  project: Project;
+  inviter: {
+    id: string;
+    profile: {
+      name: string;
+      avatarUrl: string | null;
+    } | null;
+  };
+}
+
 export interface PomodoroState {
   isRunning: boolean;
   timeRemaining: number; // in seconds
@@ -169,11 +219,14 @@ interface ElphexStore {
   activeView: "kanban" | "list" | "timeline" | "calendar" | "table";
   isLoading: boolean;
   theme: "light" | "dark";
+  taskTemplates: TaskTemplate[]; // Added state
+  invitations: BoardInvitation[]; // Added state
+  labels: Label[]; // Added state
 
   // Actions
   fetchInitialData: () => Promise<void>;
-  addTask: (title: string, projectId: string, sectionId: string, options?: Partial<Task> & { assigneeId?: string }) => Promise<void>;
-  updateTask: (taskId: string, updates: Partial<Task> & { assigneeId?: string | null }) => Promise<void>;
+  addTask: (title: string, projectId: string, sectionId: string, options?: Partial<Task> & { assigneeId?: string; customFieldValues?: { fieldId: string; value: string }[] }) => Promise<void>;
+  updateTask: (taskId: string, updates: Partial<Omit<Task, 'labels'>> & { assigneeId?: string | null; labels?: string[] }) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   toggleTaskStatus: (taskId: string) => Promise<void>;
   
@@ -201,6 +254,17 @@ interface ElphexStore {
   logout: () => Promise<void>;
   updateUserPlan: (plan: string) => void;
   addWorkspace: (name: string) => Promise<void>;
+
+  // Added Actions
+  addProject: (name: string, color: string, workspaceId: string) => Promise<void>;
+  addSection: (name: string, projectId: string) => Promise<void>;
+  addCustomFieldDef: (name: string, type: string, options: string | null, projectId: string) => Promise<void>;
+  addTaskTemplate: (name: string, projectId: string, taskData: any) => Promise<void>;
+  inviteMemberToBoard: (username: string, projectId: string) => Promise<{ success: boolean; error?: string }>;
+  respondToInvitation: (invitationId: string, action: "ACCEPT" | "DECLINE") => Promise<void>;
+  addLabel: (name: string, color: string, workspaceId: string) => Promise<void>;
+  updateLabel: (id: string, name: string, color: string) => Promise<void>;
+  deleteLabel: (id: string) => Promise<void>;
 }
 
 export const useElphexStore = create<ElphexStore>((set, get) => ({
@@ -231,6 +295,9 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
     activeTaskId: null,
     ambientSound: "NONE",
   },
+  taskTemplates: [],
+  invitations: [],
+  labels: [],
 
   // Actions
   fetchInitialData: async () => {
@@ -263,8 +330,11 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
           purchasedRewards: data.purchasedRewards,
           achievements: data.achievements,
           activeProjectId: newActiveProjectId,
+          taskTemplates: data.taskTemplates || [],
+          invitations: data.invitations || [],
+          labels: data.labels || [],
         });
-      } else if (res.status === 401) {
+      } else if (res.status === 401 || res.status === 404) {
         window.location.href = "/login";
       }
     } catch (error) {
@@ -714,6 +784,199 @@ export const useElphexStore = create<ElphexStore>((set, get) => ({
       }
     } catch (error) {
       console.error("Error creating workspace", error);
+    }
+  },
+
+  // Added Actions implementations
+  addProject: async (name: string, color: string, workspaceId: string) => {
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color, workspaceId }),
+      });
+      if (res.ok) {
+        const data = await res.json(); // { project, sections }
+        set((state) => ({
+          projects: [...state.projects, { ...data.project, customFieldDefs: [] }],
+          sections: [...state.sections, ...data.sections],
+          activeProjectId: data.project.id,
+        }));
+        get().showXpGain(20, "Board Baru Berhasil Dibuat!");
+      }
+    } catch (error) {
+      console.error("Error adding project/board", error);
+    }
+  },
+
+  addSection: async (name: string, projectId: string) => {
+    try {
+      const res = await fetch("/api/sections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, projectId }),
+      });
+      if (res.ok) {
+        const newSection = await res.json();
+        set((state) => ({
+          sections: [...state.sections, newSection],
+        }));
+      }
+    } catch (error) {
+      console.error("Error adding section", error);
+    }
+  },
+
+  addCustomFieldDef: async (name: string, type: string, options: string | null, projectId: string) => {
+    try {
+      const res = await fetch("/api/custom-fields", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, type, options, projectId }),
+      });
+      if (res.ok) {
+        const newDef = await res.json();
+        set((state) => ({
+          projects: state.projects.map((p) => 
+            p.id === projectId 
+              ? { ...p, customFieldDefs: [...(p.customFieldDefs || []), newDef] } 
+              : p
+          ),
+        }));
+        get().showXpGain(10, "Kustom Field Ditambahkan!");
+      }
+    } catch (error) {
+      console.error("Error adding custom field definition", error);
+    }
+  },
+
+  addTaskTemplate: async (name: string, projectId: string, taskData: any) => {
+    try {
+      const res = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, projectId, ...taskData }),
+      });
+      if (res.ok) {
+        const newTemplate = await res.json();
+        set((state) => ({
+          taskTemplates: [...state.taskTemplates, newTemplate],
+        }));
+        get().showXpGain(15, "Template Tugas Disimpan!");
+      }
+    } catch (error) {
+      console.error("Error adding task template", error);
+    }
+  },
+
+  inviteMemberToBoard: async (username: string, projectId: string) => {
+    try {
+      const res = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, projectId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        get().showXpGain(5, `Undangan terkirim ke @${username}!`);
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      console.error("Error inviting member to board", error);
+      return { success: false, error: "Terjadi kesalahan jaringan" };
+    }
+  },
+
+  respondToInvitation: async (invitationId: string, action: "ACCEPT" | "DECLINE") => {
+    try {
+      const res = await fetch(`/api/invitations/${invitationId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Remove processed invitation
+        set((state) => ({
+          invitations: state.invitations.filter((i) => i.id !== invitationId),
+        }));
+        
+        if (action === "ACCEPT") {
+          get().showXpGain(data.xpGained || 30, "Menerima Undangan Kolaborasi!", data.levelUp);
+          // Reload initial data to fetch new workspace, members, projects, etc.
+          await get().fetchInitialData();
+        } else {
+          get().showXpGain(5, "Undangan Ditolak");
+        }
+      }
+    } catch (error) {
+      console.error("Error responding to board invitation", error);
+    }
+  },
+
+  addLabel: async (name: string, color: string, workspaceId: string) => {
+    try {
+      const res = await fetch("/api/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color, workspaceId }),
+      });
+      if (res.ok) {
+        const newLabel = await res.json();
+        set((state) => ({
+          labels: [...state.labels, newLabel],
+        }));
+        get().showXpGain(5, `Label "${name}" dibuat!`);
+      }
+    } catch (error) {
+      console.error("Error adding label", error);
+    }
+  },
+
+  updateLabel: async (id: string, name: string, color: string) => {
+    try {
+      const res = await fetch(`/api/labels/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, color }),
+      });
+      if (res.ok) {
+        const updatedLabel = await res.json();
+        set((state) => ({
+          labels: state.labels.map((l) => (l.id === id ? updatedLabel : l)),
+          tasks: state.tasks.map((task) => ({
+            ...task,
+            labels: task.labels.map((tl) =>
+              tl.label.id === id ? { ...tl, label: updatedLabel } : tl
+            ),
+          })),
+        }));
+        get().showXpGain(5, "Label berhasil diperbarui!");
+      }
+    } catch (error) {
+      console.error("Error updating label", error);
+    }
+  },
+
+  deleteLabel: async (id: string) => {
+    try {
+      const res = await fetch(`/api/labels/${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        set((state) => ({
+          labels: state.labels.filter((l) => l.id !== id),
+          tasks: state.tasks.map((task) => ({
+            ...task,
+            labels: task.labels.filter((tl) => tl.label.id !== id),
+          })),
+        }));
+        get().showXpGain(5, "Label berhasil dihapus!");
+      }
+    } catch (error) {
+      console.error("Error deleting label", error);
     }
   },
 }));

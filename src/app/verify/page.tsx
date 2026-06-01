@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { KeyRound, ShieldCheck, AlertCircle, MessageSquare } from "lucide-react";
+import { KeyRound, ShieldCheck, AlertCircle } from "lucide-react";
 
-export default function VerifyPage() {
+function VerifyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
@@ -204,5 +204,17 @@ export default function VerifyPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen w-full flex items-center justify-center bg-[#0a0f1d] text-slate-400 text-xs font-semibold">
+        Memuat Halaman Verifikasi...
+      </div>
+    }>
+      <VerifyPageContent />
+    </Suspense>
   );
 }

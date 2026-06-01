@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Phone, AlertCircle } from "lucide-react";
+import { Mail, Lock, User, Phone, AlertCircle, Tag } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,13 +26,20 @@ export default function RegisterPage() {
       return;
     }
 
+    // Basic username validation: lowercase letters, numbers, underscores, at least 3 chars
+    const usernameRegex = /^[a-zA-Z0-9_]{3,15}$/;
+    if (!usernameRegex.test(username)) {
+      setError("Username harus 3-15 karakter, hanya huruf, angka, dan underscore");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone, password, confirmPassword }),
+        body: JSON.stringify({ name, username, email, phone, password, confirmPassword }),
       });
 
       const data = await res.json();
@@ -96,6 +104,21 @@ export default function RegisterPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Masukkan nama lengkap Anda"
+                className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Username</label>
+            <div className="relative">
+              <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              <input
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "").toLowerCase())}
+                placeholder="Contoh: artha_gp"
                 className="glass-input w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-medium"
               />
             </div>

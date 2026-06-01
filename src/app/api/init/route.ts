@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getLevelTitle } from "@/lib/gameEngine";
 import { cookies } from "next/headers";
 
 export async function GET() {
@@ -19,7 +18,9 @@ export async function GET() {
     });
 
     if (!userRecord) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      const response = NextResponse.json({ error: "User not found" }, { status: 404 });
+      response.cookies.delete("elphex-session");
+      return response;
     }
 
     // 2. Fetch XP, Streaks, Pet
@@ -70,11 +71,46 @@ export async function GET() {
       avatarUrl: member.user.profile?.avatarUrl || `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${member.userId}`,
     }));
 
+    // Fetch projects with their custom field definitions
     const projects = await prisma.project.findMany({
       where: { workspaceId: { in: workspaceIds }, isArchived: false },
+      include: {
+        customFieldDefs: true,
+      },
     });
 
     const projectIds = projects.map((p) => p.id);
+
+    // Fetch labels and auto-seed defaults if any workspace has 0 labels
+    let labels = await prisma.label.findMany({
+      where: { workspaceId: { in: workspaceIds } },
+    });
+
+    for (const ws of workspaces) {
+      const wsLabels = labels.filter((l) => l.workspaceId === ws.id);
+      if (wsLabels.length === 0) {
+        const defaults = [
+          { name: "Feature", color: "#216e4e" },
+          { name: "Bug", color: "#ae2e24" },
+          { name: "Urgent", color: "#a54800" },
+          { name: "Refactor", color: "#5e4db2" },
+          { name: "Design", color: "#7f5f01" },
+          { name: "Marketing", color: "#0c66e4" },
+        ];
+        const created = [];
+        for (const item of defaults) {
+          const newL = await prisma.label.create({
+            data: {
+              workspaceId: ws.id,
+              name: item.name,
+              color: item.color,
+            },
+          });
+          created.push(newL);
+        }
+        labels = [...labels, ...created];
+      }
+    }
 
     // 4. Fetch sections
     const sections = await prisma.section.findMany({
@@ -82,7 +118,7 @@ export async function GET() {
       orderBy: { position: "asc" },
     });
 
-    // 5. Fetch tasks (with subtasks, dependencies, labels)
+    // 5. Fetch tasks (with subtasks, dependencies, labels, customFieldValues)
     const tasks = await prisma.task.findMany({
       where: {
         projectId: { in: projectIds },
@@ -92,6 +128,7 @@ export async function GET() {
         subtasks: { orderBy: { position: "asc" } },
         labels: { include: { label: true } },
         dependencies: { select: { dependsOnTaskId: true, type: true } },
+        customFieldValues: { include: { field: true } },
         assignees: {
           include: {
             user: {
@@ -160,9 +197,28 @@ export async function GET() {
         : null,
     }));
 
-    // 10. Assemble User Profile Object
+    // 10. Fetch Task Templates
+    const taskTemplates = await prisma.taskTemplate.findMany({
+      where: { projectId: { in: projectIds } },
+    });
+
+    // 11. Fetch Board/Project Invitations
+    const invitations = await prisma.boardInvitation.findMany({
+      where: { inviteeId: userId, status: "PENDING" },
+      include: {
+        project: true,
+        inviter: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+    });
+
+    // 12. Assemble User Profile Object
     const userProfile = {
       id: userRecord.id,
+      username: userRecord.username,
       email: userRecord.email,
       name: userRecord.profile?.name || "Explorer",
       avatarUrl: userRecord.profile?.avatarUrl || null,
@@ -193,6 +249,9 @@ export async function GET() {
       rewardItems,
       purchasedRewards,
       achievements,
+      taskTemplates,
+      invitations,
+      labels,
     });
   } catch (error) {
     console.error("API Init Error:", error);

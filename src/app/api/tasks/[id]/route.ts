@@ -23,6 +23,8 @@ export async function PATCH(
     if (body.status !== undefined) updateData.status = body.status;
     if (body.priority !== undefined) updateData.priority = body.priority;
     if (body.dueDate !== undefined) updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (body.startDate !== undefined) updateData.startDate = body.startDate ? new Date(body.startDate) : null;
+    if (body.dueDateReminder !== undefined) updateData.dueDateReminder = body.dueDateReminder;
     if (body.position !== undefined) updateData.position = body.position;
     if (body.sectionId !== undefined) updateData.sectionId = body.sectionId;
     if (body.calendarType !== undefined) updateData.calendarType = body.calendarType;
@@ -41,6 +43,42 @@ export async function PATCH(
       }
     }
 
+    if (body.labels !== undefined && Array.isArray(body.labels)) {
+      await prisma.taskLabel.deleteMany({
+        where: { taskId: id },
+      });
+      if (body.labels.length > 0) {
+        await prisma.taskLabel.createMany({
+          data: body.labels.map((labelId: string) => ({
+            taskId: id,
+            labelId,
+          })),
+        });
+      }
+    }
+
+    // Upsert custom field values if provided
+    if (body.customFieldValues !== undefined && Array.isArray(body.customFieldValues)) {
+      for (const cf of body.customFieldValues) {
+        await prisma.taskCustomFieldValue.upsert({
+          where: {
+            taskId_fieldId: {
+              taskId: id,
+              fieldId: cf.fieldId,
+            },
+          },
+          update: {
+            value: String(cf.value),
+          },
+          create: {
+            taskId: id,
+            fieldId: cf.fieldId,
+            value: String(cf.value),
+          },
+        });
+      }
+    }
+
     const updatedTask = await prisma.task.update({
       where: { id },
       data: updateData,
@@ -48,6 +86,7 @@ export async function PATCH(
         subtasks: { orderBy: { position: "asc" } },
         labels: { include: { label: true } },
         dependencies: { select: { dependsOnTaskId: true, type: true } },
+        customFieldValues: { include: { field: true } },
         assignees: {
           include: {
             user: {

@@ -196,15 +196,19 @@ function DashboardContent({ user, pet }: { user: any; pet: any }) {
                       <div className="min-w-0">
                         <p className="text-sm font-bold text-slate-300 truncate">{task.title}</p>
                         <div className="flex items-center space-x-2 mt-1">
-                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold border ${
-                            task.priority === "URGENT" 
-                              ? "bg-red-500/10 border-red-500/20 text-red-400" 
-                              : task.priority === "HIGH" 
-                                ? "bg-orange-500/10 border-orange-500/20 text-orange-400" 
-                                : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                          }`}>
-                            {task.priority}
-                          </span>
+                          {task.priority && task.priority !== "NONE" && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-extrabold border ${
+                              task.priority === "URGENT" 
+                                ? "bg-red-500/10 border-red-500/20 text-red-400" 
+                                : task.priority === "HIGH" 
+                                  ? "bg-orange-500/10 border-orange-500/20 text-orange-400" 
+                                  : task.priority === "MEDIUM"
+                                    ? "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                                    : "bg-slate-500/10 border-slate-500/20 text-slate-400" // LOW
+                            }`}>
+                              {task.priority}
+                            </span>
+                          )}
                           {task.dueDate && (
                             <div className="flex items-center text-[10px] text-slate-500 font-medium">
                               <Calendar size={10} className="mr-1" />

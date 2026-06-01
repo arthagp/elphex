@@ -83,24 +83,53 @@ export async function POST(request: Request) {
     });
 
     await prisma.section.create({
-      data: { id: `sec_${user.id}_doing`, projectId: personalProject.id, name: "In Progress", position: 2.0 },
+      data: { id: `sec_${user.id}_doing`, projectId: personalProject.id, name: "Ongoing", position: 2.0 },
     });
 
     await prisma.section.create({
-      data: { id: `sec_${user.id}_done`, projectId: personalProject.id, name: "Completed", position: 3.0 },
+      data: { id: `sec_${user.id}_done`, projectId: personalProject.id, name: "Done", position: 3.0 },
     });
 
+    // Create default workspace labels with premium Trello-like colors
+    const defaultLabels = [
+      { id: `lbl_${user.id}_feature`, name: "Feature", color: "#216e4e" },
+      { id: `lbl_${user.id}_bug`, name: "Bug", color: "#ae2e24" },
+      { id: `lbl_${user.id}_urgent`, name: "Urgent", color: "#a54800" },
+      { id: `lbl_${user.id}_refactor`, name: "Refactor", color: "#5e4db2" },
+      { id: `lbl_${user.id}_design`, name: "Design", color: "#7f5f01" },
+      { id: `lbl_${user.id}_marketing`, name: "Marketing", color: "#0c66e4" },
+    ];
+    for (const item of defaultLabels) {
+      await prisma.label.create({
+        data: {
+          id: item.id,
+          workspaceId: personalWorkspace.id,
+          name: item.name,
+          color: item.color,
+        },
+      });
+    }
+
     // Create a welcome task
-    await prisma.task.create({
+    const welcomeTask = await prisma.task.create({
       data: {
+        id: `tsk_${user.id}_welcome`,
         title: "Selamat datang di Elphex! Selesaikan tugas pertama Anda",
-        description: "Cobalah memindahkan tugas ini dari kolom To Do ke In Progress lalu Completed.",
+        description: "Cobalah memindahkan tugas ini dari kolom To Do ke Ongoing lalu Done.",
         status: "TODO",
         priority: "LOW",
         projectId: personalProject.id,
         sectionId: secTodo.id,
         createdBy: user.id,
         position: 1000.0,
+      },
+    });
+
+    // Link welcome task to Marketing (blue) label
+    await prisma.taskLabel.create({
+      data: {
+        taskId: welcomeTask.id,
+        labelId: `lbl_${user.id}_marketing`,
       },
     });
 

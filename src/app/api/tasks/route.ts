@@ -11,7 +11,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
-    const { title, projectId, sectionId, priority, dueDate, assigneeId } = body;
+    const { 
+      title, 
+      projectId, 
+      sectionId, 
+      priority, 
+      dueDate, 
+      startDate, 
+      dueDateReminder, 
+      assigneeId,
+      customFieldValues 
+    } = body;
 
     if (!title || !projectId || !sectionId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -29,8 +39,10 @@ export async function POST(request: Request) {
         title,
         description: body.description || "",
         status: "TODO",
-        priority: priority || "MEDIUM",
+        priority: priority || "NONE",
+        startDate: startDate ? new Date(startDate) : null,
         dueDate: dueDate ? new Date(dueDate) : null,
+        dueDateReminder: dueDateReminder || "NONE",
         projectId,
         sectionId,
         createdBy: userId,
@@ -42,11 +54,20 @@ export async function POST(request: Request) {
               },
             }
           : undefined,
+        customFieldValues: customFieldValues && Array.isArray(customFieldValues)
+          ? {
+              create: customFieldValues.map((cf: any) => ({
+                fieldId: cf.fieldId,
+                value: String(cf.value),
+              })),
+            }
+          : undefined,
       },
       include: {
         subtasks: true,
         labels: { include: { label: true } },
         dependencies: { select: { dependsOnTaskId: true, type: true } },
+        customFieldValues: { include: { field: true } },
         assignees: {
           include: {
             user: {

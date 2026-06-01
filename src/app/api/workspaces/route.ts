@@ -58,8 +58,8 @@ export async function POST(request: Request) {
     await prisma.section.createMany({
       data: [
         { id: `sec_todo_${workspace.id}`, projectId: project.id, name: "To Do", position: 1.0 },
-        { id: `sec_doing_${workspace.id}`, projectId: project.id, name: "In Progress", position: 2.0 },
-        { id: `sec_done_${workspace.id}`, projectId: project.id, name: "Completed", position: 3.0 },
+        { id: `sec_ongoing_${workspace.id}`, projectId: project.id, name: "Ongoing", position: 2.0 },
+        { id: `sec_done_${workspace.id}`, projectId: project.id, name: "Done", position: 3.0 },
       ],
     });
 

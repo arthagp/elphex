@@ -8,14 +8,23 @@ function hashPassword(password: string) {
 
 export async function POST(request: Request) {
   try {
-    const { name, email, phone, password, confirmPassword } = await request.json();
+    const { name, username, email, phone, password, confirmPassword } = await request.json();
 
-    if (!name || !email || !phone || !password || !confirmPassword) {
+    if (!name || !username || !email || !phone || !password || !confirmPassword) {
       return NextResponse.json({ error: "Semua kolom wajib diisi" }, { status: 400 });
     }
 
     if (password !== confirmPassword) {
       return NextResponse.json({ error: "Password dan konfirmasi password tidak cocok" }, { status: 400 });
+    }
+
+    // Check if username already exists
+    const existingUsername = await prisma.user.findUnique({
+      where: { username: username.trim().toLowerCase() },
+    });
+
+    if (existingUsername) {
+      return NextResponse.json({ error: "Username sudah terdaftar" }, { status: 400 });
     }
 
     // Check if email already exists
@@ -34,6 +43,7 @@ export async function POST(request: Request) {
     // Create user and profile
     const user = await prisma.user.create({
       data: {
+        username: username.trim().toLowerCase(),
         email,
         passwordHash,
         phone,

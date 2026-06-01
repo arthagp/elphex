@@ -42,6 +42,7 @@ async function main() {
   const user = await prisma.user.create({
     data: {
       id: "usr_test",
+      username: "artha_gp",
       email: "arthagusfi8@gmail.com",
       passwordHash: hashPassword("Zunos123@"),
       phone: "083848762736",
@@ -51,11 +52,11 @@ async function main() {
   });
 
   const member1 = await prisma.user.create({
-    data: { id: "usr_member1", email: "pachy@elphex.com" },
+    data: { id: "usr_member1", username: "pachy", email: "pachy@elphex.com" },
   });
 
   const member2 = await prisma.user.create({
-    data: { id: "usr_member2", email: "jumbo@elphex.com" },
+    data: { id: "usr_member2", username: "jumbo", email: "jumbo@elphex.com" },
   });
 
   // 3. Create Profile
@@ -107,11 +108,11 @@ async function main() {
 
   // Personal Labels
   const lblSelfCare = await prisma.label.create({
-    data: { id: "lbl_p_selfcare", workspaceId: personalWorkspace.id, name: "Self-Care", color: "#10B981" },
+    data: { id: "lbl_p_selfcare", workspaceId: personalWorkspace.id, name: "Self-Care", color: "#216e4e" },
   });
 
   const lblErrand = await prisma.label.create({
-    data: { id: "lbl_p_errand", workspaceId: personalWorkspace.id, name: "Belanja", color: "#F59E0B" },
+    data: { id: "lbl_p_errand", workspaceId: personalWorkspace.id, name: "Belanja", color: "#7f5f01" },
   });
 
   // Personal Project
@@ -219,19 +220,19 @@ async function main() {
 
   // Organization Labels
   const lblFeature = await prisma.label.create({
-    data: { id: "lbl_feature", workspaceId: teamWorkspace.id, name: "Fitur Utama", color: "#0085FF" },
+    data: { id: "lbl_feature", workspaceId: teamWorkspace.id, name: "Fitur Utama", color: "#0c66e4" },
   });
 
   const lblBug = await prisma.label.create({
-    data: { id: "lbl_bug", workspaceId: teamWorkspace.id, name: "Bug S1", color: "#FF3B30" },
+    data: { id: "lbl_bug", workspaceId: teamWorkspace.id, name: "Bug S1", color: "#ae2e24" },
   });
 
   const lblEnhancement = await prisma.label.create({
-    data: { id: "lbl_enhancement", workspaceId: teamWorkspace.id, name: "Peningkatan", color: "#34C759" },
+    data: { id: "lbl_enhancement", workspaceId: teamWorkspace.id, name: "Peningkatan", color: "#216e4e" },
   });
 
   const lblDoc = await prisma.label.create({
-    data: { id: "lbl_doc", workspaceId: teamWorkspace.id, name: "Dokumentasi", color: "#FF9500" },
+    data: { id: "lbl_doc", workspaceId: teamWorkspace.id, name: "Dokumentasi", color: "#a54800" },
   });
 
   // Team Project
